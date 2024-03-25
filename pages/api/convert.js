@@ -19,6 +19,7 @@ function logToFile(message) {
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
+    logToFile("DOING POST");
     try {
       const { apiKey, fileUrl } = req.body;
 
@@ -55,8 +56,10 @@ export default async function handler(req, res) {
         },
       });
 
-      const jobId = processResponse.data.id;
+      const jobId = processResponse.data.data.id;
       logToFile(`Job created: ${jobId}`);
+
+      logToFile(`Job content: ${JSON.stringify(processResponse.data)}`);
 
       // Polling the job status to wait until it's finished
       let jobResponse;
@@ -67,15 +70,16 @@ export default async function handler(req, res) {
           },
         });
 
+        logToFile(`Job status content: ${JSON.stringify(jobResponse.data)}`);
         await new Promise(resolve => setTimeout(resolve, 1000)); // Wait a second before polling again
-      } while (jobResponse.data.status !== 'finished' && jobResponse.data.status !== 'error');
+      } while (jobResponse.data.data.status !== 'finished' && jobResponse.data.data.status !== 'error');
 
-      if (jobResponse.data.status === 'error') {
+      if (jobResponse.data.data.status === 'error') {
         throw new Error('Error during conversion process');
       }
 
       // Collect the output URLs
-      const outputUrls = jobResponse.data.tasks
+      const outputUrls = jobResponse.data.data.tasks
         .filter(task => task.name === 'export-my-file')
         .flatMap(task => task.result.files.map(file => file.url));
 
@@ -84,7 +88,7 @@ export default async function handler(req, res) {
     } catch (error) {
       logToFile(`Error: ${error.message}`);
       return res.status(500).json({ error: error.message });
-    }
+    } 
   } else {
     res.setHeader('Allow', ['POST']);
     const methodNotAllowedMessage = `Method ${req.method} Not Allowed`;
